@@ -24,7 +24,7 @@
         <include>gr/gousiosg/javacg/dyn/*.class</include>
       </includes>
       <directory>target/classes</directory>
-      <outputDirectory>/</outputDirectory>
+      <outputDirectory/>
     </fileSet>
   </fileSets>
 </assembly>
