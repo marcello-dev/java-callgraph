@@ -48,16 +48,16 @@ public class JCallGraph {
 
     public static void main(String[] args) {
 
-        Function<ClassParser, ClassVisitor> getClassVisitor =
-                (ClassParser cp) -> {
-                    try {
-                        return new ClassVisitor(cp.parse());
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                };
+        Function<ClassParser, ClassVisitor> getClassVisitor = (ClassParser cp) -> {
+            try {
+                return new ClassVisitor(cp.parse());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
 
         try {
+
             for (String arg : args) {
 
                 File f = new File(arg);
@@ -67,44 +67,23 @@ public class JCallGraph {
                 }
 
                 try (JarFile jar = new JarFile(f)) {
-                    Stream<JarEntry> entries = enumerationAsStream(jar.entries());
 
-                    String methodCalls = entries.
-                            flatMap(e -> {
-                                if (e.isDirectory() || !e.getName().endsWith(".class"))
-                                    return (new ArrayList<String>()).stream();
-
-                                ClassParser cp = new ClassParser(arg, e.getName());
-                                return getClassVisitor.apply(cp).start().methodCalls().stream();
-                            }).
-                            map(s -> s + "\n").
-                            reduce(new StringBuilder(),
-                                    StringBuilder::append,
-                                    StringBuilder::append).toString();
-
-                    BufferedWriter log = new BufferedWriter(new OutputStreamWriter(System.out));
-                    log.write(methodCalls);
-                    log.close();
+                    Enumeration<JarEntry> jarEntries = jar.entries();
+                    while (jarEntries.hasMoreElements()) {
+                        JarEntry jarEntry = jarEntries.nextElement();
+                        if (jarEntry.isDirectory() || !jarEntry.getName().endsWith(".class")) {
+                            continue;
+                        }
+                        ClassParser cp = new ClassParser(arg, jarEntry.getName());
+                        getClassVisitor.apply(cp).start()
+                                .methodCalls()
+                                .forEach(System.out::println);
+                    }
                 }
             }
         } catch (IOException e) {
             System.err.println("Error while processing jar: " + e.getMessage());
             e.printStackTrace();
         }
-    }
-
-    public static <T> Stream<T> enumerationAsStream(Enumeration<T> e) {
-        return StreamSupport.stream(
-                Spliterators.spliteratorUnknownSize(
-                        new Iterator<T>() {
-                            public T next() {
-                                return e.nextElement();
-                            }
-
-                            public boolean hasNext() {
-                                return e.hasMoreElements();
-                            }
-                        },
-                        Spliterator.ORDERED), false);
     }
 }

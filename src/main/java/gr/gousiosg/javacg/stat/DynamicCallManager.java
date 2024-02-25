@@ -21,10 +21,12 @@ import java.util.regex.Pattern;
 import org.apache.bcel.classfile.Attribute;
 import org.apache.bcel.classfile.BootstrapMethod;
 import org.apache.bcel.classfile.BootstrapMethods;
+import org.apache.bcel.classfile.Constant;
 import org.apache.bcel.classfile.ConstantCP;
 import org.apache.bcel.classfile.ConstantMethodHandle;
 import org.apache.bcel.classfile.ConstantNameAndType;
 import org.apache.bcel.classfile.ConstantPool;
+import org.apache.bcel.classfile.ConstantString;
 import org.apache.bcel.classfile.ConstantUtf8;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
@@ -81,7 +83,11 @@ public class DynamicCallManager {
         while (matcher.find()) {
             int bootIndex = Integer.parseInt(matcher.group(1));
             BootstrapMethod bootMethod = boots[bootIndex];
-            int calledIndex = bootMethod.getBootstrapArguments()[CALL_HANDLE_INDEX_ARGUMENT];
+            int[] bootstrapArguments = bootMethod.getBootstrapArguments();
+            if (bootstrapArguments.length <= 1) {
+                continue;
+            }
+            int calledIndex = bootstrapArguments[CALL_HANDLE_INDEX_ARGUMENT];
             String calledName = getMethodNameFromHandleIndex(cp, calledIndex);
             String callerName = method.getName();
             dynamicCallers.put(calledName, callerName);
@@ -89,10 +95,20 @@ public class DynamicCallManager {
     }
 
     private String getMethodNameFromHandleIndex(ConstantPool cp, int callIndex) {
-        ConstantMethodHandle handle = (ConstantMethodHandle) cp.getConstant(callIndex);
-        ConstantCP ref = (ConstantCP) cp.getConstant(handle.getReferenceIndex());
-        ConstantNameAndType nameAndType = (ConstantNameAndType) cp.getConstant(ref.getNameAndTypeIndex());
-        return nameAndType.getName(cp);
+        Constant constant = cp.getConstant(callIndex);
+        String methodName;
+        if (constant instanceof ConstantMethodHandle) {
+            ConstantMethodHandle constantMethodHandle = (ConstantMethodHandle) constant;
+            ConstantCP ref = (ConstantCP) cp.getConstant(constantMethodHandle.getReferenceIndex());
+            ConstantNameAndType nameAndType = (ConstantNameAndType) cp.getConstant(ref.getNameAndTypeIndex());
+            methodName = nameAndType.getName(cp);
+        } else if (constant instanceof ConstantString) {
+            ConstantString constantString = (ConstantString) constant;
+            methodName = constantString.getBytes(cp);
+        } else {
+            methodName = "UnknownMethod";
+        }
+        return methodName;
     }
 
     /**
@@ -120,6 +136,6 @@ public class DynamicCallManager {
                 return ((BootstrapMethods) attribute).getBootstrapMethods();
             }
         }
-        return new BootstrapMethod[]{};
+        return new BootstrapMethod[] {};
     }
 }
